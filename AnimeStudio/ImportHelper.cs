@@ -1,4 +1,4 @@
-﻿using Org.Brotli.Dec;
+using Org.Brotli.Dec;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -1123,6 +1123,51 @@ namespace AnimeStudio
             ms.Write(data);
             ms.Position = 0;
             return new FileReader(reader.FullPath, ms);
+        }
+
+        public static FileReader DecryptSiNiSistar(FileReader reader)
+        {
+            Logger.Verbose($"Attempting to decrypt file {reader.FileName} with SiNiSistar encryption");
+
+            string uniqueX = "D9AB89AE56F56734";
+            string uniqueY = "0BFAB156A793DCE7F";
+
+            string ivStr = uniqueX + "01127832CDEF04BC";
+            string keyStr = uniqueY + "06889412C23ED45";
+
+            Logger.Verbose($"Using key: {keyStr}");
+            Logger.Verbose($"Using IV:  {ivStr}");
+
+            var data = reader.ReadBytes((int)reader.Remaining);
+
+            try
+            {
+                var keyBytes = System.Text.Encoding.UTF8.GetBytes(keyStr);
+                var ivBytes = System.Text.Encoding.UTF8.GetBytes(ivStr);
+
+                if (keyBytes.Length > 32)
+                {
+                    Logger.Verbose($"Truncating key from {keyBytes.Length} to 32 bytes");
+                    byte[] truncated = new byte[32];
+                    Array.Copy(keyBytes, truncated, 32);
+                    keyBytes = truncated;
+                }
+
+                var decrypted = Rijndael256.DecryptCbcPkcs7(data, keyBytes, ivBytes);
+
+                Logger.Verbose("Decrypted SiNiSistar file successfully !!");
+
+                MemoryStream ms = new();
+                ms.Write(decrypted);
+                ms.Position = 0;
+                return new FileReader(reader.FullPath, ms);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error decrypting SiNiSistar file: {ex}");
+                reader.Position = 0;
+                return reader;
+            }
         }
     }
 }
